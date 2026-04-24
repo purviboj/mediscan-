@@ -17,3 +17,19 @@ The hand-tracking model is loaded from a CDN at runtime, so internet access is r
 
 - `/` proposal and project summary
 - `/prototype.html` interactive touchless CT viewer demo with webcam hand tracking
+
+## Using Real CT Slice Images
+
+The prototype will automatically use real image slices if you place them in:
+
+`/Users/purvibojedla/mediscan/ct-slices`
+
+Name them in order, for example:
+
+- `slice-01.png`
+- `slice-02.png`
+- `slice-03.png`
+
+You can also use `.jpg` or `.jpeg`.
+
+If the folder is missing or the files are not found, the app falls back to the synthetic CT-style viewer.

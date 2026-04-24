@@ -29,6 +29,7 @@
           <span class="status-label">Computer Vision</span>
           <strong id="cvStatus">Camera offline</strong>
           <p id="cvNarrative">Enable webcam access to detect hand gestures in the browser.</p>
+          <div id="cvAlert" class="cv-alert cv-alert-idle">System idle</div>
         </div>
 
         <button id="cameraToggle" class="button button-solid">Start Camera Tracking</button>
@@ -44,6 +45,11 @@
           <span class="status-label">Recognized Gesture</span>
           <strong id="gestureLabel">Idle</strong>
           <p id="gestureNarrative">System waiting for surgeon hand movement.</p>
+        </div>
+
+        <div class="status-card">
+          <span class="status-label">CV Debug</span>
+          <p id="debugReadout">Waiting for hand landmarks.</p>
         </div>
 
         <div class="status-card">
@@ -75,11 +81,33 @@
               <span id="latencyBadge">Latency: -- ms</span>
             </div>
             <div id="scanFrame" class="scan-frame">
+              <img id="ctSliceImage" class="ct-slice-image" alt="CT slice view" />
               <div class="ct-grid"></div>
               <div class="ct-core"></div>
               <div class="ct-ring ct-ring-one"></div>
               <div class="ct-ring ct-ring-two"></div>
               <div id="zoomBadge" class="zoom-badge">1.0x</div>
+            </div>
+            <div class="gesture-guide gesture-guide-below">
+              <div class="gesture-guide-header">Gesture Guide</div>
+              <div class="gesture-guide-grid">
+                <div class="gesture-guide-item">
+                  <span class="gesture-icon">👈</span>
+                  <span class="gesture-copy">Previous slice</span>
+                </div>
+                <div class="gesture-guide-item">
+                  <span class="gesture-icon">👉</span>
+                  <span class="gesture-copy">Next slice</span>
+                </div>
+                <div class="gesture-guide-item">
+                  <span class="gesture-icon">✋</span>
+                  <span class="gesture-copy">Pause / resume</span>
+                </div>
+                <div class="gesture-guide-item">
+                  <span class="gesture-icon">🤏</span>
+                  <span class="gesture-copy">Zoom</span>
+                </div>
+              </div>
             </div>
           </div>
 

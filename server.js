@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = __dirname;
-const port = Number(process.env.PORT) || 3000;
+const preferredPort = Number(process.env.PORT) || 3000;
 const host = "127.0.0.1";
 
 const contentTypes = {
@@ -39,6 +39,20 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(port, host, () => {
-  console.log(`Medi-Scan app running at http://${host}:${port}`);
-});
+const startServer = (port, retriesLeft = 10) => {
+  server.once("error", (error) => {
+    if (error.code === "EADDRINUSE" && retriesLeft > 0 && !process.env.PORT) {
+      const nextPort = port + 1;
+      console.warn(`Port ${port} is in use. Trying ${nextPort}...`);
+      startServer(nextPort, retriesLeft - 1);
+      return;
+    }
+    throw error;
+  });
+
+  server.listen(port, host, () => {
+    console.log(`Medi-Scan app running at http://${host}:${port}`);
+  });
+};
+
+startServer(preferredPort);

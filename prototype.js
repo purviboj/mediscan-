@@ -36,12 +36,17 @@ let trackingEnabled = false;
 let pauseCooldownUntil = 0;
 let smoothedPinch = null;
 let availableCtSlices = [];
-let lastPinchState = "neutral";
+let lastPinchDistance = null;
 let handPresenceFrames = 0;
 let pinchEngaged = false;
 let navZoneState = "center";
 let missingHandFrames = 0;
 let recalibrating = false;
+let trackingReadyAt = 0;
+let palmOpenSince = 0;
+let pinchClosedFrames = 0;
+let zoneHoldFrames = 0;
+let zoneCandidate = "center";
 
 const defaultCtSliceCandidates = Array.from({ length: 24 }, (_, index) => {
   const sliceNumber = String(index + 1).padStart(2, "0");
@@ -60,6 +65,11 @@ const colors = {
 const now = () => performance.now();
 
 const getSliceCount = () => availableCtSlices.length || 24;
+const GESTURE_WARMUP_MS = 900;
+const MIN_STABLE_FRAMES = 6;
+const PAUSE_HOLD_MS = 450;
+const PINCH_HOLD_FRAMES = 3;
+const SWIPE_HOLD_FRAMES = 3;
 
 const setCvState = (status, narrative) => {
   cvStatus.textContent = status;
@@ -159,6 +169,32 @@ controls.forEach((control) => {
 });
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+const applyContinuousZoom = (pinchVelocity) => {
+  const zoomSensitivity = 2.4;
+  const zoomDeadZone = 0.004;
+  const zoomDelta = pinchVelocity * zoomSensitivity;
+
+  if (Math.abs(zoomDelta) < zoomDeadZone) {
+    return false;
+  }
+
+  const nextZoom = clamp(zoomLevel + zoomDelta, 0.8, 1.8);
+  if (Math.abs(nextZoom - zoomLevel) < 0.002) {
+    return false;
+  }
+
+  paused = false;
+  zoomLevel = nextZoom;
+  setActiveButton("zoom");
+  updateView(
+    zoomDelta > 0 ? "Pinch To Zoom" : "Release Pinch",
+    zoomDelta > 0
+      ? "Magnified the current slice for closer review of anatomy."
+      : "Reduced magnification to restore the broader field of view."
+  );
+  return true;
+};
 
 const landmarkDistance = (a, b) => {
   const dx = a.x - b.x;
@@ -265,13 +301,38 @@ const handleLandmarks = (landmarks, handednessLabel) => {
   missingHandFrames = 0;
   recalibrating = false;
 
-  if (palmOpen && currentTime > pauseCooldownUntil) {
+  if (currentTime < trackingReadyAt || handPresenceFrames < MIN_STABLE_FRAMES) {
+    pinchEngaged = false;
+    pinchClosedFrames = 0;
+    lastPinchDistance = null;
+    navZoneState = "center";
+    zoneCandidate = "center";
+    zoneHoldFrames = 0;
+    setCvState("Analyzing hand", "Hold your hand steady while the model calibrates motion.");
+    setCvAlert("🔄 Recalibrating...", "info");
+    setDebugReadout(`calibrating | frames=${handPresenceFrames} | pinch=${normalizedPinch.toFixed(2)}`);
+    return;
+  }
+
+  if (palmOpen) {
+    if (palmOpenSince === 0) {
+      palmOpenSince = currentTime;
+    }
+  } else {
+    palmOpenSince = 0;
+  }
+
+  if (palmOpenSince !== 0 && currentTime - palmOpenSince >= PAUSE_HOLD_MS && currentTime > pauseCooldownUntil) {
     pauseCooldownUntil = currentTime + 1600;
     invokeAction("pause");
     smoothedPinch = normalizedPinch;
-    lastPinchState = "neutral";
+    lastPinchDistance = null;
     pinchEngaged = false;
+    pinchClosedFrames = 0;
+    palmOpenSince = 0;
     navZoneState = "center";
+    zoneCandidate = "center";
+    zoneHoldFrames = 0;
     gestureRecognized = true;
     setDebugReadout(`pause gesture | fingers=${extendedFingerCount} | pinch=${normalizedPinch.toFixed(2)}`);
     setCvAlert("🔄 Recalibrating...", "info");
@@ -280,9 +341,12 @@ const handleLandmarks = (landmarks, handednessLabel) => {
 
   if (paused) {
     smoothedPinch = normalizedPinch;
-    lastPinchState = "neutral";
+    lastPinchDistance = null;
     pinchEngaged = false;
+    pinchClosedFrames = 0;
     navZoneState = "center";
+    zoneCandidate = "center";
+    zoneHoldFrames = 0;
     setDebugReadout(`paused | fingers=${extendedFingerCount} | pinch=${normalizedPinch.toFixed(2)}`);
     setCvAlert("🔄 Recalibrating...", "info");
     return;
@@ -292,16 +356,35 @@ const handleLandmarks = (landmarks, handednessLabel) => {
   const pinchReleased = normalizedPinch > 0.72;
 
   if (pinchClosed && extendedFingerCount <= 3) {
+    pinchClosedFrames += 1;
+  } else {
+    pinchClosedFrames = 0;
+  }
+
+  if (pinchClosedFrames >= PINCH_HOLD_FRAMES) {
     pinchEngaged = true;
   } else if (pinchReleased) {
     pinchEngaged = false;
-    lastPinchState = "neutral";
+    lastPinchDistance = null;
+    pinchClosedFrames = 0;
   }
 
   const currentZone = indexTipX < 0.32 ? "left" : indexTipX > 0.68 ? "right" : "center";
 
   if (!pinchEngaged) {
-    if (currentZone === "left" && navZoneState !== "left") {
+    if (currentZone !== "center") {
+      if (zoneCandidate === currentZone) {
+        zoneHoldFrames += 1;
+      } else {
+        zoneCandidate = currentZone;
+        zoneHoldFrames = 1;
+      }
+    } else {
+      zoneCandidate = "center";
+      zoneHoldFrames = 0;
+    }
+
+    if (currentZone === "left" && navZoneState !== "left" && zoneHoldFrames >= SWIPE_HOLD_FRAMES) {
       navZoneState = "left";
       invokeAction("prev");
       gestureRecognized = true;
@@ -310,7 +393,7 @@ const handleLandmarks = (landmarks, handednessLabel) => {
       return;
     }
 
-    if (currentZone === "right" && navZoneState !== "right") {
+    if (currentZone === "right" && navZoneState !== "right" && zoneHoldFrames >= SWIPE_HOLD_FRAMES) {
       navZoneState = "right";
       invokeAction("next");
       gestureRecognized = true;
@@ -326,27 +409,20 @@ const handleLandmarks = (landmarks, handednessLabel) => {
 
   if (pinchEngaged && smoothedPinch !== null) {
     smoothedPinch = (smoothedPinch * 0.82) + (normalizedPinch * 0.18);
-    const pinchDelta = normalizedPinch - smoothedPinch;
-
-    if (pinchDelta < -0.065 && lastPinchState !== "pinched") {
-      lastPinchState = "pinched";
-      invokeAction("zoomIn");
-      gestureRecognized = true;
-      setDebugReadout(`pinch in | delta=${pinchDelta.toFixed(3)} | fingers=${extendedFingerCount}`);
-      setCvAlert("Gesture recognized", "info");
-      return;
-    } else if (pinchDelta > 0.065 && lastPinchState !== "spread") {
-      lastPinchState = "spread";
-      invokeAction("zoomOut");
-      gestureRecognized = true;
-      setDebugReadout(`pinch out | delta=${pinchDelta.toFixed(3)} | fingers=${extendedFingerCount}`);
-      setCvAlert("Gesture recognized", "info");
-      return;
-    } else if (Math.abs(pinchDelta) < 0.035) {
-      lastPinchState = "neutral";
+    if (lastPinchDistance !== null) {
+      const pinchVelocity = lastPinchDistance - smoothedPinch;
+      if (applyContinuousZoom(pinchVelocity)) {
+        gestureRecognized = true;
+        setDebugReadout(`pinch zoom | velocity=${pinchVelocity.toFixed(3)} | fingers=${extendedFingerCount}`);
+        setCvAlert("Gesture recognized", "info");
+        lastPinchDistance = smoothedPinch;
+        return;
+      }
     }
+    lastPinchDistance = smoothedPinch;
   } else {
     smoothedPinch = normalizedPinch;
+    lastPinchDistance = null;
   }
 
   if (brightness !== null && brightness < 55) {
@@ -389,10 +465,15 @@ const detectFrame = () => {
       handPresenceFrames = 0;
       missingHandFrames += 1;
       smoothedPinch = null;
-      lastPinchState = "neutral";
+      lastPinchDistance = null;
       pinchEngaged = false;
+      pinchClosedFrames = 0;
+      palmOpenSince = 0;
       navZoneState = "center";
+      zoneCandidate = "center";
+      zoneHoldFrames = 0;
       recalibrating = missingHandFrames > 18;
+      trackingReadyAt = now() + GESTURE_WARMUP_MS;
       setCvState(
         recalibrating ? "Recalibrating" : "Searching",
         recalibrating
@@ -464,11 +545,16 @@ const stopTracking = () => {
   cameraFeed.srcObject = null;
   smoothedPinch = null;
   handPresenceFrames = 0;
-  lastPinchState = "neutral";
+  lastPinchDistance = null;
   pinchEngaged = false;
+  pinchClosedFrames = 0;
+  palmOpenSince = 0;
   navZoneState = "center";
+  zoneCandidate = "center";
+  zoneHoldFrames = 0;
   missingHandFrames = 0;
   recalibrating = false;
+  trackingReadyAt = 0;
   lastVideoTime = -1;
   setDebugReadout("Tracking stopped.");
 };
@@ -517,8 +603,9 @@ const startTracking = async () => {
     cameraFeed.srcObject = cameraStream;
     await cameraFeed.play();
     trackingEnabled = true;
+    trackingReadyAt = now() + GESTURE_WARMUP_MS;
     cameraToggle.textContent = "Stop Camera Tracking";
-    setCvState("Camera live", "Hand tracker ready. Use swipe, pinch, or open palm gestures.");
+    setCvState("Analyzing hand", "Camera live. Hold your hand steady for a moment before gesturing.");
     setCvAlert("Camera live", "info");
     detectFrame();
   } catch (error) {

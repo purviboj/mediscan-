@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Medi-Scan Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="prototype-body">
+    <div class="prototype-shell">
+      <aside class="prototype-sidebar">
+        <a href="/" class="ghost-link">Back to Proposal</a>
+        <div>
+          <p class="eyebrow">Interactive Prototype</p>
+          <h1>Touchless CT Viewer</h1>
+          <p>
+            This simulates the sterile-field workflow in your slides: surgeon-centered control with
+            validated delay and communication risk metrics.
+          </p>
+        </div>
+
+        <div class="status-card">
+          <span class="status-label">Computer Vision</span>
+          <strong id="cvStatus">Camera offline</strong>
+          <p id="cvNarrative">Enable webcam access to detect hand gestures in the browser.</p>
+        </div>
+
+        <button id="cameraToggle" class="button button-solid">Start Camera Tracking</button>
+
+        <div class="control-panel">
+          <button class="control-button active" data-action="prev">Swipe Left</button>
+          <button class="control-button" data-action="next">Swipe Right</button>
+          <button class="control-button" data-action="zoom">Pinch To Zoom</button>
+          <button class="control-button" data-action="pause">Open Palm Pause</button>
+        </div>
+
+        <div class="status-card">
+          <span class="status-label">Recognized Gesture</span>
+          <strong id="gestureLabel">Idle</strong>
+          <p id="gestureNarrative">System waiting for surgeon hand movement.</p>
+        </div>
+
+        <div class="status-card">
+          <span class="status-label">Ideal Customer Profile</span>
+          <ul class="plain-list">
+            <li>Primary user: Surgeon, scrub tech, radiologist</li>
+            <li>Primary customer: Hospital system / IDN</li>
+            <li>Clinical champion: Chief of Surgery / CMIO</li>
+          </ul>
+        </div>
+      </aside>
+
+      <main class="prototype-main">
+        <div class="viewer-header">
+          <div>
+            <p class="eyebrow">Procedure View</p>
+            <h2>Case: Cranial CT Review</h2>
+          </div>
+          <div class="viewer-badges">
+            <span>Gesture Control Active</span>
+            <span id="sliceCounter">Slice 12 / 24</span>
+          </div>
+        </div>
+
+        <section class="viewer-stage">
+          <div class="scan-viewer">
+            <div class="scan-overlay">
+              <span>Touchless Mode</span>
+              <span id="latencyBadge">Latency: -- ms</span>
+            </div>
+            <div id="scanFrame" class="scan-frame">
+              <div class="ct-grid"></div>
+              <div class="ct-core"></div>
+              <div class="ct-ring ct-ring-one"></div>
+              <div class="ct-ring ct-ring-two"></div>
+              <div id="zoomBadge" class="zoom-badge">1.0x</div>
+            </div>
+          </div>
+
+          <div class="metrics-panel">
+            <article class="metric-card camera-card">
+              <span>Live hand tracking</span>
+              <div class="camera-stack">
+                <video id="cameraFeed" class="camera-feed" autoplay playsinline muted></video>
+                <canvas id="handOverlay" class="hand-overlay"></canvas>
+              </div>
+            </article>
+            <article class="metric-card">
+              <span>Avg delay per imaging request</span>
+              <strong id="delayMetric">3-7 min</strong>
+            </article>
+            <article class="metric-card">
+              <span>OR teams reporting communication errors</span>
+              <strong>~23%</strong>
+            </article>
+            <article class="metric-card">
+              <span>Surgeons preferring hands-free control</span>
+              <strong>68%</strong>
+            </article>
+            <article class="metric-card">
+              <span>Workflow status</span>
+              <strong id="responseMetric">Immediate image update</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="prototype-phases">
+          <article class="phase-inline">
+            <strong>Customer Profile</strong>
+            <span>High-stakes sterile environments, CT/MRI-dependent procedures</span>
+          </article>
+          <article class="phase-inline">
+            <strong>Problem Validation</strong>
+            <span>Manual relay creates delay, disruption, and sterility risk</span>
+          </article>
+          <article class="phase-inline">
+            <strong>Market Analysis</strong>
+            <span>TAM: $40-50B, SAM: $10-15B, SOM: $200-500M (3-5 years)</span>
+          </article>
+          <article class="phase-inline">
+            <strong>Business Model</strong>
+            <span>Capital + recurring mix aligned to hospital procurement cycles</span>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./prototype.js"></script>
+  </body>
+</html>

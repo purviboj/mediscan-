@@ -94,7 +94,7 @@ The system:
 ```bash
 cd mediscan-
 npm install
-npm run dev
+npm run dev or npm start(if you don't have dev installed)
 ```
 
 Then open:

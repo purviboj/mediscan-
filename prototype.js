@@ -26,6 +26,7 @@ const brightnessProbe = document.createElement("canvas");
 const brightnessContext = brightnessProbe.getContext("2d", { willReadFrequently: true });
 
 let currentSlice = 12;
+let smoothedNavX = null;
 let zoomLevel = 1;
 let paused = false;
 let handLandmarker = null;
@@ -369,7 +370,18 @@ const handleLandmarks = (landmarks, handednessLabel) => {
     pinchClosedFrames = 0;
   }
 
-  const currentZone = indexTipX < 0.32 ? "left" : indexTipX > 0.68 ? "right" : "center";
+const displayIndexTipX = 1 - indexTipX;
+
+// smoothing (stabilizes jitter)
+smoothedNavX = smoothedNavX === null
+  ? displayIndexTipX
+  : (smoothedNavX * 0.78) + (displayIndexTipX * 0.22);
+
+// zone detection based on smoothed motion
+const currentZone =
+  smoothedNavX < 0.3 ? "left" :
+  smoothedNavX > 0.7 ? "right" :
+  "center";
 
   if (!pinchEngaged) {
     if (currentZone !== "center") {
@@ -388,8 +400,7 @@ const handleLandmarks = (landmarks, handednessLabel) => {
       navZoneState = "left";
       invokeAction("prev");
       gestureRecognized = true;
-      setDebugReadout(`left zone trigger | x=${indexTipX.toFixed(3)} | fingers=${extendedFingerCount}`);
-      setCvAlert("Gesture recognized", "info");
+setDebugReadout(`left zone trigger | screenX=${smoothedNavX.toFixed(3)} | fingers=${extendedFingerCount}`);      setCvAlert("Gesture recognized", "info");
       return;
     }
 
@@ -397,8 +408,7 @@ const handleLandmarks = (landmarks, handednessLabel) => {
       navZoneState = "right";
       invokeAction("next");
       gestureRecognized = true;
-      setDebugReadout(`right zone trigger | x=${indexTipX.toFixed(3)} | fingers=${extendedFingerCount}`);
-      setCvAlert("Gesture recognized", "info");
+setDebugReadout(`right zone trigger | screenX=${smoothedNavX.toFixed(3)} | fingers=${extendedFingerCount}`);      setCvAlert("Gesture recognized", "info");
       return;
     }
 
@@ -436,8 +446,7 @@ const handleLandmarks = (landmarks, handednessLabel) => {
   }
 
   setDebugReadout(
-    `tracking | zone=${currentZone} | x=${indexTipX.toFixed(3)} | pinch=${normalizedPinch.toFixed(2)} | fingers=${extendedFingerCount} | light=${brightness === null ? "na" : brightness.toFixed(0)} | pinchMode=${pinchEngaged ? "on" : "off"}`
-  );
+`tracking | zone=${currentZone} | screenX=${smoothedNavX.toFixed(3)} | pinch=${normalizedPinch.toFixed(2)} | fingers=${extendedFingerCount} | light=${brightness === null ? "na" : brightness.toFixed(0)} | pinchMode=${pinchEngaged ? "on" : "off"}`  );
 };
 
 const detectFrame = () => {
@@ -462,6 +471,7 @@ const detectFrame = () => {
       handleLandmarks(result.landmarks[0], handednessLabel);
     } else {
       clearOverlay();
+      smoothedNavX = null;
       handPresenceFrames = 0;
       missingHandFrames += 1;
       smoothedPinch = null;
@@ -541,7 +551,7 @@ const stopTracking = () => {
     cameraStream.getTracks().forEach((track) => track.stop());
     cameraStream = null;
   }
-
+  smoothedNavX = null;
   cameraFeed.srcObject = null;
   smoothedPinch = null;
   handPresenceFrames = 0;
@@ -583,6 +593,7 @@ const loadHandLandmarker = async () => {
 const startTracking = async () => {
   if (trackingEnabled) {
     stopTracking();
+    smoothedNavX = null;
     return;
   }
 
